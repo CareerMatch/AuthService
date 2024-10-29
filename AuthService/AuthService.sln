@@ -1,0 +1,21 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthService", "AuthService\AuthService.csproj", "{D07F3D88-DDBA-4425-9B11-582A67B65108}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{809F3834-FA4A-4B3D-AAE8-E61769539AA1}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose.yml = docker-compose.yml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D07F3D88-DDBA-4425-9B11-582A67B65108}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D07F3D88-DDBA-4425-9B11-582A67B65108}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D07F3D88-DDBA-4425-9B11-582A67B65108}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D07F3D88-DDBA-4425-9B11-582A67B65108}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
