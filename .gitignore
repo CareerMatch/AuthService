@@ -1,0 +1,16 @@
+# Ignore IDE files
+.idea/
+.vscode/
+
+# Ignore build output
+bin/
+obj/
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore user secrets
+**/secrets.json
+
+# Ignore logs
+*.log
