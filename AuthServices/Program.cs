@@ -5,7 +5,6 @@ using AuthServices.Services;
 using System.Text;
 using AuthServices.Config;
 using AuthServices.Repository;
-using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,15 +19,6 @@ builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Retrieve JwtSettings instance
-builder.Services.AddSingleton(resolver =>
-{
-    var jwtSettings = resolver.GetRequiredService<IOptions<JwtSettings>>().Value;
-    if (string.IsNullOrEmpty(jwtSettings.SecretKey) || string.IsNullOrEmpty(jwtSettings.Issuer) || string.IsNullOrEmpty(jwtSettings.Audience))
-        throw new ArgumentNullException("JwtSettings: Configuration values are missing.");
-    return jwtSettings;
-});
-
 // Configure Authentication
 builder.Services.AddAuthentication(options =>
     {
@@ -37,7 +27,11 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(options =>
     {
-        var jwtSettings = builder.Services.BuildServiceProvider().GetRequiredService<JwtSettings>();
+        // Retrieve JwtSettings directly from configuration
+        var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
+        if (jwtSettings == null)
+            throw new ArgumentNullException("JwtSettings: Configuration values are missing.");
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
