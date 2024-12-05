@@ -1,6 +1,17 @@
-﻿services:
-  authservice:
-    image: authservice
-    build:
-      context: .
-      dockerfile: AuthService/Dockerfile
+﻿version: "3.8"
+services:
+  auth-service:
+    image: ${DOCKER_USERNAME}/auth-services:v1
+    ports:
+      - "8081:8080"
+    environment:
+      MONGO_CONNECTION_STRING: "${MONGO_CONNECTION_STRING}"
+      MONGO_DATABASE_NAME: "${MONGO_DATABASE_NAME}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY}"
+      JWT_ISSUER: "${JWT_ISSUER}"
+      JWT_AUDIENCE: "${JWT_AUDIENCE}"
+      JWT_ACCESS_TOKEN_EXPIRY: 10
+      JWT_REFRESH_TOKEN_EXPIRY: 7
+networks:
+  auth-network:
+    driver: bridge
