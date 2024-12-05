@@ -35,6 +35,7 @@ jobs:
 
       - name: Deploy Auth Service with Docker Compose
         env:
+          DOCKER_USERNAME : ${{ secrets.DOCKER_USERNAME }}
           MONGO_CONNECTION_STRING: ${{ secrets.MONGO_CONNECTION_STRING }}
           MONGO_DATABASE_NAME: ${{ secrets.MONGO_DATABASE_NAME }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
