@@ -14,3 +14,7 @@ obj/
 
 # Ignore logs
 *.log
+
+# Ignore appsettings.json files
+appsettings.json
+appsettings.*.json
