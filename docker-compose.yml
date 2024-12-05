@@ -5,13 +5,10 @@ services:
     ports:
       - "8081:8080"
     environment:
-      MONGO_CONNECTION_STRING: "${MONGO_CONNECTION_STRING}"
-      MONGO_DATABASE_NAME: "${MONGO_DATABASE_NAME}"
-      JWT_SECRET_KEY: "${JWT_SECRET_KEY}"
-      JWT_ISSUER: "${JWT_ISSUER}"
-      JWT_AUDIENCE: "${JWT_AUDIENCE}"
-      JWT_ACCESS_TOKEN_EXPIRY: 10
-      JWT_REFRESH_TOKEN_EXPIRY: 7
-networks:
-  auth-network:
-    driver: bridge
+      - MongoDbSettings__ConnectionString=${MONGO_CONNECTION_STRING}
+      - MongoDbSettings__DatabaseName=${MONGO_DATABASE_NAME}
+      - JwtSettings__SecretKey=${JWT_SECRET}
+      - JwtSettings__Issuer=${JWT_ISSUER}
+      - JwtSettings__Audience=${JWT_AUDIENCE}
+      - JwtSettings__AccessTokenExpiryMinutes=10 # Optional, default value
+      - JwtSettings__RefreshTokenExpiryDays=7  
