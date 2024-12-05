@@ -4,8 +4,11 @@ namespace AuthServices.Services;
 
 public interface IAuthService
 {
-    string Register(RegisterDTO registerDto);
-    RefreshTokenOutputDTO Login(LoginDTO loginDto);
+    Task<string> RegisterAsync(RegisterDTO dto);
     
-    string RefreshAccessToken(string refreshToken);
+    Task<RefreshTokenOutputDTO> LoginAsync(LoginDTO dto);
+    
+    Task<string> RefreshAccessTokenAsync(string refreshToken);
+    
+    Task LogoutAsync(string refreshToken);
 }

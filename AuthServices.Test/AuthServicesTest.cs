@@ -4,99 +4,148 @@ using AuthServices.DTOs;
 using AuthServices.Models;
 using AuthServices.Repository;
 using AuthServices.Services;
-using Microsoft.Extensions.Configuration;
-using System;
+using Microsoft.Extensions.Options;
+using AuthServices.Config;
 
-namespace AuthServices.Tests;
-
-public class AuthServiceTests
+namespace AuthServices.Tests
 {
-    private readonly Mock<IAuthRepository> _authRepositoryMock;
-    private readonly Mock<IConfiguration> _configurationMock;
-    private readonly AuthService _authService;
-
-    public AuthServiceTests()
+    public class AuthServiceTests
     {
-        _authRepositoryMock = new Mock<IAuthRepository>();
-        _configurationMock = new Mock<IConfiguration>();
+        private readonly Mock<IAuthRepository> _authRepositoryMock;
+        private readonly Mock<IOptions<JwtSettings>> _jwtSettingsMock;
+        private readonly AuthService _authService;
 
-        // Mocking the configuration for JWT
-        _configurationMock.Setup(config => config["JwtSettings:SecretKey"]).Returns("oIVH2c38/+tvPKZHFrIus4NfCua4wfeKUrkrZbMmV/Y=");
-        _configurationMock.Setup(config => config["JwtSettings:Issuer"]).Returns("AuthService");
-        _configurationMock.Setup(config => config["JwtSettings:Audience"]).Returns("AuthServiceAudience");
-
-        // Initialize the AuthService with mocked dependencies
-        _authService = new AuthService(_authRepositoryMock.Object, _configurationMock.Object);
-    }
-
-    [Fact]
-    public void Register_User_Success()
-    {
-        // Arrange
-        var registerDto = new RegisterDTO
+        public AuthServiceTests()
         {
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "johndoe@example.com",
-            Password = "password123"
-        };
+            _authRepositoryMock = new Mock<IAuthRepository>();
+            _jwtSettingsMock = new Mock<IOptions<JwtSettings>>();
 
-        // Act
-        var result = _authService.Register(registerDto);
+            // Mocking the JwtSettings configuration
+            _jwtSettingsMock.Setup(config => config.Value).Returns(new JwtSettings
+            {
+                SecretKey = "oIVH2c38/+tvPKZHFrIus4NfCua4wfeKUrkrZbMmV/Y=",
+                Issuer = "AuthService",
+                Audience = "AuthServiceAudience",
+                AccessTokenExpiryMinutes = 15,
+                RefreshTokenExpiryDays = 7
+            });
 
-        // Assert
-        Assert.Equal("User registered successfully", result);
-        _authRepositoryMock.Verify(repo => repo.AddUser(It.IsAny<AuthModel>()), Times.Once);
-    }
+            // Initialize the AuthService with mocked dependencies
+            _authService = new AuthService(_authRepositoryMock.Object, _jwtSettingsMock.Object);
+        }
 
-    [Fact]
-    public void Login_User_Success()
-    {
-        // Arrange
-        var loginDto = new LoginDTO
+        [Fact]
+        public async Task Register_User_Success()
         {
-            Email = "johndoe@example.com",
-            Password = "password123"
-        };
+            // Arrange
+            var registerDto = new RegisterDTO
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "johndoe@example.com",
+                Password = "password123"
+            };
 
-        var user = new AuthModel
+            _authRepositoryMock.Setup(repo => repo.GetUserByEmailAsync(registerDto.Email))
+                .ReturnsAsync((AuthModel)null);
+
+            // Act
+            var result = await _authService.RegisterAsync(registerDto);
+
+            // Assert
+            Assert.Equal("User registered successfully", result);
+            _authRepositoryMock.Verify(repo => repo.AddUserAsync(It.IsAny<AuthModel>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Login_User_Success()
         {
-            Id = Guid.NewGuid().ToString(),
-            Email = "johndoe@example.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
-            Role = "User"
-        };
+            // Arrange
+            var loginDto = new LoginDTO
+            {
+                Email = "johndoe@example.com",
+                Password = "password123"
+            };
 
-        _authRepositoryMock.Setup(repo => repo.GetUserByEmail(loginDto.Email)).Returns(user);
+            var user = new AuthModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "johndoe@example.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
+                Role = "User"
+            };
 
-        // Act
-        var result = _authService.Login(loginDto);
+            _authRepositoryMock.Setup(repo => repo.GetUserByEmailAsync(loginDto.Email))
+                .ReturnsAsync(user);
 
-        // Assert
-        Assert.NotNull(result.AccessToken);
-        Assert.NotNull(result.RefreshToken);
-        _authRepositoryMock.Verify(repo => repo.UpdateUser(It.IsAny<AuthModel>()), Times.Once);
-    }
+            // Act
+            var result = await _authService.LoginAsync(loginDto);
 
-    [Fact]
-    public void RefreshAccessToken_ValidToken_Success()
-    {
-        // Arrange
-        var refreshToken = "valid_refresh_token";
-        var user = new AuthModel
+            // Assert
+            Assert.NotNull(result.AccessToken);
+            Assert.NotNull(result.RefreshToken);
+            _authRepositoryMock.Verify(repo => repo.UpdateUserAsync(It.IsAny<AuthModel>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task RefreshAccessToken_ValidToken_Success()
         {
-            Id = Guid.NewGuid().ToString(),
-            Email = "johndoe@example.com",
-            RefreshToken = refreshToken,
-            RefreshTokenExpiry = DateTime.UtcNow.AddDays(1)
-        };
+            // Arrange
+            var refreshToken = "valid_refresh_token";
+            var user = new AuthModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "johndoe@example.com",
+                RefreshToken = refreshToken,
+                RefreshTokenExpiry = DateTime.UtcNow.AddDays(1) // Ensure this is a future date
+            };
 
-        _authRepositoryMock.Setup(repo => repo.GetUserByRefreshToken(refreshToken)).Returns(user);
+            _authRepositoryMock.Setup(repo => repo.GetUserByRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(user); // Simulate finding the user with the refresh token.
 
-        // Act
-        var newAccessToken = _authService.RefreshAccessToken(refreshToken);
+            // Act
+            var newAccessToken = await _authService.RefreshAccessTokenAsync(refreshToken);
 
-        // Assert
-        Assert.NotNull(newAccessToken);
+            // Assert
+            Assert.NotNull(newAccessToken);
+            _authRepositoryMock.Verify(repo => repo.GetUserByRefreshTokenAsync(refreshToken), Times.Once);
+        }
+
+        [Fact]
+        public async Task RefreshAccessToken_InvalidToken_ThrowsException()
+        {
+            // Arrange
+            var invalidRefreshToken = "invalid_refresh_token";
+
+            _authRepositoryMock.Setup(repo => repo.GetUserByRefreshTokenAsync(invalidRefreshToken))
+                .ReturnsAsync((AuthModel)null);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                _authService.RefreshAccessTokenAsync(invalidRefreshToken));
+        }
+
+        [Fact]
+        public async Task Logout_User_Success()
+        {
+            // Arrange
+            var refreshToken = "valid_refresh_token";
+            var user = new AuthModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "johndoe@example.com",
+                RefreshToken = refreshToken,
+                RefreshTokenExpiry = DateTime.UtcNow.AddDays(1)
+            };
+
+            _authRepositoryMock.Setup(repo => repo.GetUserByRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(user);
+
+            // Act
+            await _authService.LogoutAsync(refreshToken);
+
+            // Assert
+            _authRepositoryMock.Verify(repo => repo.UpdateUserAsync(It.Is<AuthModel>(u => u.RefreshToken == null)), Times.Once);
+        }
     }
 }

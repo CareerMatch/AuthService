@@ -13,19 +13,28 @@ public class AuthRepository : IAuthRepository
     public AuthRepository(MongoDbContext context)
     {
         _authModels = context.AuthModels;
+        EnsureIndexes();
     }
 
-    public AuthModel GetUserByEmail(string email) =>
-        _authModels.Find(user => user.Email == email).FirstOrDefault();
-
-    public void AddUser(AuthModel user) =>
-        _authModels.InsertOne(user);
-
-    public void UpdateUser(AuthModel user) =>
-        _authModels.ReplaceOne(u => u.Id == user.Id, user);
-    
-    public AuthModel GetUserByRefreshToken(string refreshToken) // Implement this method
+    private void EnsureIndexes()
     {
-        return _authModels.Find(user => user.RefreshToken == refreshToken).FirstOrDefault();
+        _authModels.Indexes.CreateOne(new CreateIndexModel<AuthModel>(
+            Builders<AuthModel>.IndexKeys.Ascending(user => user.Email),
+            new CreateIndexOptions { Unique = true }));
+
+        _authModels.Indexes.CreateOne(new CreateIndexModel<AuthModel>(
+            Builders<AuthModel>.IndexKeys.Ascending(user => user.RefreshToken)));
     }
+
+    public async Task<AuthModel> GetUserByEmailAsync(string email) =>
+        await _authModels.Find(user => user.Email == email).FirstOrDefaultAsync();
+
+    public async Task AddUserAsync(AuthModel user) =>
+        await _authModels.InsertOneAsync(user);
+
+    public async Task UpdateUserAsync(AuthModel user) =>
+        await _authModels.ReplaceOneAsync(u => u.Id == user.Id, user);
+
+    public async Task<AuthModel> GetUserByRefreshTokenAsync(string refreshToken) =>
+        await _authModels.Find(user => user.RefreshToken == refreshToken).FirstOrDefaultAsync();
 }

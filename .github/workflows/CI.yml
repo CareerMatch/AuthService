@@ -1,21 +1,15 @@
-# .github/workflows/ci.yml
 name: CI Workflow
 
-# Trigger the workflow on push to dev and main, and on pull requests to these branches
 on:
   push:
     branches:
       - dev
-      - main
   pull_request:
     branches:
-      - dev
       - main
-
+    
 jobs:
   build:
-
-    # Use the latest Ubuntu runner for the build
     runs-on: self-hosted
 
     steps:
@@ -28,32 +22,15 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0'  # Replace with your .NET version
-      
+
       # Step 3: Restore dependencies
       - name: Restore dependencies
-        run: dotnet restore
-      
+        run: dotnet restore ./AuthServices.sln
+
       # Step 4: Build the application
       - name: Build the application
-        run: dotnet build --no-restore --configuration Release
-      
+        run: dotnet build --no-restore --configuration Release ./AuthServices.sln
+
       # Step 5: Run tests
       - name: Run tests
-        run: dotnet test --no-restore --verbosity normal
-  
-  deploy:
-    runs-on: self-hosted
-    needs: [build]
-    steps:
-      - name: checkout code
-        uses: actions/checkout@v3
-
-      - name: Build and Push Auth Service Docker image
-        env:
-          APP_UID: 1000
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/auth-services:v1 ./AuthServices
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/auth-services:v1
-        
-      
+        run: dotnet test --no-restore --verbosity normal ./AuthServices.sln

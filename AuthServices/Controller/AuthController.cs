@@ -5,7 +5,7 @@ using AuthServices.Services;
 namespace AuthServices.Controller;
 
 [ApiController]
-[Route("auth")]
+[Route("api/auth")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -16,23 +16,42 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public IActionResult Register([FromBody] RegisterDTO dto)
+    public async Task<IActionResult> Register([FromBody] RegisterDTO dto)
     {
-        _authService.Register(dto);
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        await _authService.RegisterAsync(dto);
         return Ok("User registered successfully");
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginDTO dto)
+    public async Task<IActionResult> Login([FromBody] LoginDTO dto)
     {
-        var tokens = _authService.Login(dto);
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var tokens = await _authService.LoginAsync(dto);
         return Ok(new { tokens.AccessToken, tokens.RefreshToken });
     }
 
     [HttpPost("refresh")]
-    public IActionResult Refresh([FromBody] RefreshTokenDTO dto)
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenDTO dto)
     {
-        var newAccessToken = _authService.RefreshAccessToken(dto.RefreshToken);
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var newAccessToken = await _authService.RefreshAccessTokenAsync(dto.RefreshToken);
         return Ok(new { AccessToken = newAccessToken });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenDTO dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        await _authService.LogoutAsync(dto.RefreshToken);
+        return Ok("Logged out successfully");
     }
 }

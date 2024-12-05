@@ -3,9 +3,11 @@ using Models;
 
 public interface IAuthRepository
 {
-    AuthModel GetUserByEmail(string email);
-    void AddUser(AuthModel user);
-    void UpdateUser(AuthModel user);
+    Task<AuthModel> GetUserByEmailAsync(string email);
     
-    AuthModel GetUserByRefreshToken(string refreshToken);
+    Task AddUserAsync(AuthModel user);
+    
+    Task UpdateUserAsync(AuthModel user);
+    
+    Task<AuthModel> GetUserByRefreshTokenAsync(string refreshToken);
 }
