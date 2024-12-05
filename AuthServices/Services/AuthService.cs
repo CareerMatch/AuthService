@@ -2,9 +2,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using AuthServices.Config;
 using AuthServices.DTOs;
 using AuthServices.Models;
 using AuthServices.Repository;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthServices.Services;
@@ -12,21 +14,18 @@ namespace AuthServices.Services;
 public class AuthService : IAuthService
 {
     private readonly IAuthRepository _authRepository;
-    private readonly string _jwtSecretKey;
-    private readonly string _issuer;
-    private readonly string _audience;
+    private readonly JwtSettings _jwtSettings;
 
-    public AuthService(IAuthRepository authRepository, IConfiguration config)
+    public AuthService(IAuthRepository authRepository, IOptions<JwtSettings> jwtSettings)
     {
         _authRepository = authRepository;
-        _jwtSecretKey = config["JwtSettings:SecretKey"];
-        _issuer = config["JwtSettings:Issuer"];
-        _audience = config["JwtSettings:Audience"];
+        _jwtSettings = jwtSettings.Value;
     }
 
-    public string Register(RegisterDTO dto)
+    public async Task<string> RegisterAsync(RegisterDTO dto)
     {
-        if (_authRepository.GetUserByEmail(dto.Email) != null)
+        var existingUser = await _authRepository.GetUserByEmailAsync(dto.Email);
+        if (existingUser != null)
             throw new Exception("User already exists");
 
         var user = new AuthModel
@@ -36,27 +35,25 @@ public class AuthService : IAuthService
             Email = dto.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             RefreshToken = GenerateRefreshToken(),
-            RefreshTokenExpiry = DateTime.UtcNow.AddDays(7)
+            RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
         };
 
-        _authRepository.AddUser(user);
+        await _authRepository.AddUserAsync(user);
         return "User registered successfully";
     }
 
-    public RefreshTokenOutputDTO Login(LoginDTO dto)
+    public async Task<RefreshTokenOutputDTO> LoginAsync(LoginDTO dto)
     {
-        var user = _authRepository.GetUserByEmail(dto.Email);
+        var user = await _authRepository.GetUserByEmailAsync(dto.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             throw new UnauthorizedAccessException("Invalid credentials");
 
-        // Generate tokens
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken();
 
-        // Update user with new refresh token and expiry
         user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-        _authRepository.UpdateUser(user);
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays);
+        await _authRepository.UpdateUserAsync(user);
 
         return new RefreshTokenOutputDTO
         {
@@ -65,18 +62,28 @@ public class AuthService : IAuthService
         };
     }
 
-    public string RefreshAccessToken(string refreshToken)
+    public async Task<string> RefreshAccessTokenAsync(string refreshToken)
     {
-        var user = _authRepository.GetUserByRefreshToken(refreshToken);
+        var user = await _authRepository.GetUserByRefreshTokenAsync(refreshToken);
         if (user == null || user.RefreshTokenExpiry <= DateTime.UtcNow)
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
 
         return GenerateAccessToken(user);
     }
 
+    public async Task LogoutAsync(string refreshToken)
+    {
+        var user = await _authRepository.GetUserByRefreshTokenAsync(refreshToken);
+        if (user == null)
+            throw new UnauthorizedAccessException("Invalid token");
+
+        user.RefreshToken = null;
+        await _authRepository.UpdateUserAsync(user);
+    }
+
     private string GenerateAccessToken(AuthModel user)
     {
-        var key = Convert.FromBase64String(_jwtSecretKey);
+        var key = Encoding.UTF8.GetBytes(_jwtSettings.SecretKey);
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -85,11 +92,10 @@ public class AuthService : IAuthService
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
             }),
-            Expires = DateTime.UtcNow.AddMinutes(1),
-            SigningCredentials =
-                new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
-            Issuer = _issuer,
-            Audience = _audience
+            Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256),
+            Issuer = _jwtSettings.Issuer,
+            Audience = _jwtSettings.Audience
         };
 
         var tokenHandler = new JwtSecurityTokenHandler();
