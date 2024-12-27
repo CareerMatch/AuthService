@@ -109,6 +109,11 @@ public class AuthService : IAuthService
     private string GenerateAccessToken(AuthModel user)
     {
         var key = Encoding.UTF8.GetBytes(_jwtSettings.SecretKey);
+
+        // Current UTC time
+        var now = DateTime.UtcNow;
+
+        // Define the token descriptor with a slight buffer
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -117,7 +122,8 @@ public class AuthService : IAuthService
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
             }),
-            Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
+            NotBefore = now, // Optional: Explicitly set NotBefore to current UTC time
+            Expires = now.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes).AddSeconds(1), // Add a buffer to Expires
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256),
             Issuer = _jwtSettings.Issuer,
             Audience = _jwtSettings.Audience

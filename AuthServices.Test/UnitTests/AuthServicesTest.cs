@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using Xunit;
 using Moq;
 using AuthServices.DTOs;
@@ -7,6 +8,7 @@ using AuthServices.Services;
 using Microsoft.Extensions.Options;
 using AuthServices.Config;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace AuthServices.Test.UnitTests
 {
@@ -22,10 +24,17 @@ namespace AuthServices.Test.UnitTests
             _authRepositoryMock = new Mock<IAuthRepository>();
 
             // Mocking the JwtSettings configuration
+            var inMemorySettings = new Dictionary<string, string>
+            {
+                { "JwtSettings:SecretKey", "LoremIpsumDolorSitAmet12345678LoremIpsumDolorSitAmet" }, // At least 16 characters
+                { "JwtSettings:Issuer", "TestIssuer" },
+                { "JwtSettings:Audience", "TestAudience" },
+                { "MongoDbSettings:ConnectionString", "mongodb://localhost:27017" },
+                { "MongoDbSettings:DatabaseName", "TestDb" }
+            };
+
             var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true)
+                .AddInMemoryCollection(inMemorySettings) // Use in-memory configuration
                 .Build();
 
             var jwtSettings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
@@ -116,6 +125,22 @@ namespace AuthServices.Test.UnitTests
 
             _authRepositoryMock.Setup(repo => repo.GetUserByEmailAsync(loginDto.Email))
                 .ReturnsAsync(user);
+
+            // Mock the token generation
+            var tokenHandlerMock = new Mock<JwtSecurityTokenHandler>();
+            tokenHandlerMock.Setup(handler => handler.CreateToken(It.IsAny<SecurityTokenDescriptor>()))
+                .Returns((SecurityTokenDescriptor descriptor) =>
+                {
+                    var notBefore = DateTime.UtcNow;
+                    var expires = notBefore.AddSeconds(1); // Ensure Expires > NotBefore
+                    return new JwtSecurityToken(
+                        descriptor.Issuer,
+                        descriptor.Audience,
+                        null,
+                        notBefore,
+                        expires
+                    );
+                });
 
             // Act
             var result = await _authService.LoginAsync(loginDto);
