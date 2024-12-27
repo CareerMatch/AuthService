@@ -42,7 +42,7 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Run unit tests
-        run: dotnet test --no-build --configuration Release --filter FullyQualifiedName~AuthServices.Test.UnitTests ./AuthServices.Test
+        run: dotnet test --no-build --configuration Release --filter "FullyQualifiedName~AuthServices.Tests.UnitTests"
 
   # Integration Tests Job
   integration_tests:
@@ -58,7 +58,7 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Run integration tests
-        run: dotnet test --no-build --configuration Release --filter FullyQualifiedName~AuthServices.Test.IntegrationTests ./AuthServices.Test
+        run: dotnet test --no-build --configuration Release --filter "FullyQualifiedName~AuthServices.Test.IntegrationTests"
 
   # Deployment Job
   deploy:
