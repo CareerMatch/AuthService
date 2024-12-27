@@ -1,0 +1,94 @@
+name: CI/CD Workflow
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Build Job
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: Restore dependencies
+        run: dotnet restore ./AuthServices.sln
+
+      - name: Build the application
+        run: dotnet build --no-restore --configuration Release ./AuthServices.sln
+
+  # Unit Tests Job
+  unit_tests:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: Run unit tests
+        run: dotnet test --no-build --configuration Release --filter FullyQualifiedName~AuthServices.Test.UnitTests ./AuthServices.Test
+
+  # Integration Tests Job
+  integration_tests:
+    needs: unit_tests
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: Run integration tests
+        run: dotnet test --no-build --configuration Release --filter FullyQualifiedName~AuthServices.Test.IntegrationTests ./AuthServices.Test
+
+  # Deployment Job
+  deploy:
+    needs: [integration_tests] # Ensure deploy runs only if integration_tests succeeds
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set Environment Variables for Service
+        run: |
+          echo "SERVICE_FOLDER=AuthServices" >> $GITHUB_ENV
+          echo "IMAGE_TAG=auth-services:v1" >> $GITHUB_ENV
+
+      - name: Build and Push Docker Image
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_TAG }} ./${{ env.SERVICE_FOLDER }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_TAG }}
+
+      - name: Deploy Auth Service with Docker Compose
+        env:
+          MONGO_CONNECTION_STRING: ${{ secrets.MONGO_CONNECTION_STRING }}
+          MONGO_DATABASE_NAME: ${{ secrets.MONGO_DATABASE_NAME }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+        run: |
+          docker-compose -f ./docker-compose.yml up -d

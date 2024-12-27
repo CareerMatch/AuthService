@@ -10,21 +10,13 @@ public class AuthModel
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; }
-
-    [Required]
-    [MaxLength(100)]
-    public string FirstName { get; set; }
-
-    [Required]
-    [MaxLength(100)]
-    public string LastName { get; set; }
-
+    
+    [BsonRepresentation(BsonType.String)]
+    public Guid UserId { get; set; } = Guid.NewGuid(); // Shared User ID
+    
     [Required]
     [EmailAddress]
     public string Email { get; set; }
-    
-    [Required]
-    public DateTime DateOfBirth { get; set; }
 
     [Required]
     [MinLength(8)]
@@ -33,8 +25,6 @@ public class AuthModel
     [Required]
     [MaxLength(50)]
     public string Role { get; set; } = "User";
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Token storage fields
     public string RefreshToken { get; set; }

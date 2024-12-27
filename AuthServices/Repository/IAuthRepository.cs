@@ -9,5 +9,7 @@ public interface IAuthRepository
     
     Task UpdateUserAsync(AuthModel user);
     
+    Task DeleteUserAsync(Guid userId);
+    
     Task<AuthModel> GetUserByRefreshTokenAsync(string refreshToken);
 }

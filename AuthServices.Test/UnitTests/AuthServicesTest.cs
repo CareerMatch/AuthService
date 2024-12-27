@@ -6,32 +6,48 @@ using AuthServices.Repository;
 using AuthServices.Services;
 using Microsoft.Extensions.Options;
 using AuthServices.Config;
+using Microsoft.Extensions.Configuration;
 
-namespace AuthServices.Tests
+namespace AuthServices.Test.UnitTests
 {
     public class AuthServiceTests
     {
         private readonly Mock<IAuthRepository> _authRepositoryMock;
         private readonly Mock<IOptions<JwtSettings>> _jwtSettingsMock;
+        private readonly Mock<IRabbitMQPublisher> _rabbitMqPublisherMock;
         private readonly AuthService _authService;
 
         public AuthServiceTests()
         {
             _authRepositoryMock = new Mock<IAuthRepository>();
-            _jwtSettingsMock = new Mock<IOptions<JwtSettings>>();
 
             // Mocking the JwtSettings configuration
-            _jwtSettingsMock.Setup(config => config.Value).Returns(new JwtSettings
-            {
-                SecretKey = "oIVH2c38/+tvPKZHFrIus4NfCua4wfeKUrkrZbMmV/Y=",
-                Issuer = "AuthService",
-                Audience = "AuthServiceAudience",
-                AccessTokenExpiryMinutes = 15,
-                RefreshTokenExpiryDays = 7
-            });
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true)
+                .Build();
+
+            var jwtSettings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
+
+            // Mock the JwtSettings
+            _jwtSettingsMock = new Mock<IOptions<JwtSettings>>();
+            _jwtSettingsMock.Setup(config => config.Value).Returns(jwtSettings);
+
+            // Mock IRabbitMqPublisher
+            _rabbitMqPublisherMock = new Mock<IRabbitMQPublisher>();
+            _rabbitMqPublisherMock.Setup(publisher => publisher.SendRegisterMessageAsync(It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
+            _rabbitMqPublisherMock.Setup(publisher => publisher.SendDeleteMessageAsync(It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
+
 
             // Initialize the AuthService with mocked dependencies
-            _authService = new AuthService(_authRepositoryMock.Object, _jwtSettingsMock.Object);
+            _authService = new AuthService(
+                _authRepositoryMock.Object,
+                _jwtSettingsMock.Object,
+                _rabbitMqPublisherMock.Object
+            );
         }
 
         [Fact]
@@ -55,6 +71,29 @@ namespace AuthServices.Tests
             // Assert
             Assert.Equal("User registered successfully", result);
             _authRepositoryMock.Verify(repo => repo.AddUserAsync(It.IsAny<AuthModel>()), Times.Once);
+            _rabbitMqPublisherMock.Verify(publisher => publisher.SendRegisterMessageAsync(It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Register_User_Fails_WhenEmailExists()
+        {
+            // Arrange
+            var registerDto = new RegisterDTO
+            {
+                FirstName = "Jane",
+                LastName = "Doe",
+                Email = "janedoe@example.com",
+                Password = "password123"
+            };
+
+            var existingUser = new AuthModel { Email = registerDto.Email };
+            _authRepositoryMock.Setup(repo => repo.GetUserByEmailAsync(registerDto.Email))
+                .ReturnsAsync(existingUser);
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<Exception>(() => _authService.RegisterAsync(registerDto));
+            Assert.Equal("User already exists", exception.Message);
+            _authRepositoryMock.Verify(repo => repo.AddUserAsync(It.IsAny<AuthModel>()), Times.Never);
         }
 
         [Fact]

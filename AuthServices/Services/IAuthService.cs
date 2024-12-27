@@ -11,4 +11,6 @@ public interface IAuthService
     Task<string> RefreshAccessTokenAsync(string refreshToken);
     
     Task LogoutAsync(string refreshToken);
+    
+    Task DeleteUserAsync(Guid userId);
 }
