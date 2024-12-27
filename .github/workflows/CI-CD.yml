@@ -27,8 +27,8 @@ jobs:
 
       - name: Build the application
         run: dotnet build --no-restore --configuration Release ./AuthServices.sln
-
-  # Unit Tests Job
+  
+  # Unit Tests
   unit_tests:
     needs: build
     runs-on: self-hosted
@@ -42,9 +42,11 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Run unit tests
-        run: dotnet test ./AuthServices.Test/AuthServices.Test.csproj --no-build --configuration Release --filter "FullyQualifiedName~AuthServices.Tests.UnitTests"
-
-  # Integration Tests Job
+        run: dotnet test ./AuthServices.Test/AuthServices.Test.csproj \
+          --configuration Release \
+          --filter "FullyQualifiedName~AuthServices.Test.UnitTests"
+  
+  # Integration Tests
   integration_tests:
     needs: unit_tests
     runs-on: self-hosted
@@ -58,11 +60,13 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Run integration tests
-        run: dotnet test ./AuthServices.Test/AuthServices.Test.csproj --no-build --configuration Release --filter "FullyQualifiedName~AuthServices.Tests.IntegrationTests"
-
+        run: dotnet test ./AuthServices.Test/AuthServices.Test.csproj \
+          --configuration Release \
+          --filter "FullyQualifiedName~AuthServices.Test.IntegrationTests"
+        
   # Deployment Job
   deploy:
-    needs: [integration_tests] # Ensure deploy runs only if integration_tests succeeds
+    needs: [build,integration_tests] # Ensure deploy runs only if integration_tests succeeds
     runs-on: self-hosted
     steps:
       - name: Check out code
