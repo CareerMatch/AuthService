@@ -54,4 +54,22 @@ public class AuthController : ControllerBase
         await _authService.LogoutAsync(dto.RefreshToken);
         return Ok("Logged out successfully");
     }
+    
+    [HttpDelete("delete/{userId}")]
+    public async Task<IActionResult> DeleteUser(Guid userId)
+    {
+        try
+        {
+            await _authService.DeleteUserAsync(userId);
+            return Ok($"User with ID {userId} deleted successfully.");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
+    }
 }

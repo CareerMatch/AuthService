@@ -37,4 +37,13 @@ public class AuthRepository : IAuthRepository
 
     public async Task<AuthModel> GetUserByRefreshTokenAsync(string refreshToken) =>
         await _authModels.Find(user => user.RefreshToken == refreshToken).FirstOrDefaultAsync();
+    
+    public async Task DeleteUserAsync(Guid userId)
+    {
+        var result = await _authModels.DeleteOneAsync(user => user.UserId == userId);
+        if (result.DeletedCount == 0)
+        {
+            throw new KeyNotFoundException($"User with ID {userId} not found.");
+        }
+    }
 }

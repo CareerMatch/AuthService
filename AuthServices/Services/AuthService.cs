@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using AuthServices.Config;
 using AuthServices.DTOs;
 using AuthServices.Models;
@@ -15,30 +16,54 @@ public class AuthService : IAuthService
 {
     private readonly IAuthRepository _authRepository;
     private readonly JwtSettings _jwtSettings;
+    
+    private readonly IRabbitMQPublisher _rabbitMqPublisher;
 
-    public AuthService(IAuthRepository authRepository, IOptions<JwtSettings> jwtSettings)
+    public AuthService(
+        IAuthRepository authRepository,
+        IOptions<JwtSettings> jwtSettings,
+        IRabbitMQPublisher rabbitMqPublisher)
     {
         _authRepository = authRepository;
         _jwtSettings = jwtSettings.Value;
+        _rabbitMqPublisher = rabbitMqPublisher;
     }
 
     public async Task<string> RegisterAsync(RegisterDTO dto)
     {
+        // Step 1: Check if the user already exists in the database
         var existingUser = await _authRepository.GetUserByEmailAsync(dto.Email);
         if (existingUser != null)
             throw new Exception("User already exists");
 
+        // Step 2: Create a new AuthModel object for the user
         var user = new AuthModel
         {
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
+            UserId = Guid.NewGuid(),
             Email = dto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            RefreshToken = GenerateRefreshToken(),
-            RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password), // Hash the password
+            RefreshToken = GenerateRefreshToken(), // Generate a refresh token
+            RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays) // Set refresh token expiry
         };
+        
+        // Step 4: Serialize the RegisterDTO to JSON for RabbitMQ message
+        var message = JsonSerializer.Serialize(new
+        {
+            UserId = user.UserId,
+            dto.FirstName,
+            dto.LastName,
+            dto.DateOfBirth,
+            Role = user.Role // Add the role explicitly
+        });
 
+        // Step 5: Send the message to RabbitMQ
+        await _rabbitMqPublisher.SendRegisterMessageAsync(message);
+        
+        
+        // Step 3: Save the new user to the database
         await _authRepository.AddUserAsync(user);
+
+        // Step 6: Return a success message
         return "User registered successfully";
     }
 
@@ -84,6 +109,11 @@ public class AuthService : IAuthService
     private string GenerateAccessToken(AuthModel user)
     {
         var key = Encoding.UTF8.GetBytes(_jwtSettings.SecretKey);
+
+        // Current UTC time
+        var now = DateTime.UtcNow;
+
+        // Define the token descriptor with a slight buffer
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -92,7 +122,8 @@ public class AuthService : IAuthService
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
             }),
-            Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
+            NotBefore = now, // Optional: Explicitly set NotBefore to current UTC time
+            Expires = now.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes).AddSeconds(1), // Add a buffer to Expires
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256),
             Issuer = _jwtSettings.Issuer,
             Audience = _jwtSettings.Audience
@@ -111,5 +142,19 @@ public class AuthService : IAuthService
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
         }
+    }
+    
+    public async Task DeleteUserAsync(Guid userId)
+    {
+        // Step 1: Notify the UserService via RabbitMQ
+        var deleteMessage = JsonSerializer.Serialize(new { UserId = userId });
+        await _rabbitMqPublisher.SendDeleteMessageAsync(deleteMessage);
+
+        Console.WriteLine($"Delete event sent to RabbitMQ for UserId: {userId}");
+
+        // Step 2: Delete the user in the Auth database
+         _authRepository.DeleteUserAsync(userId);
+
+        Console.WriteLine($"User with ID {userId} deleted from Auth database.");
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using AuthServices.Models;
+using Prometheus;
 using AuthServices.Services;
 using System.Text;
 using AuthServices.Config;
@@ -14,10 +15,12 @@ builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSet
 // Configure MongoDB settings
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<MongoDbContext>();
+builder.Services.AddLogging();
 
 // Configure Repository and Services
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IRabbitMQPublisher,RabbitMqPublisher>();
 
 // Configure Authentication
 builder.Services.AddAuthentication(options =>
@@ -59,6 +62,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMetricServer(); // Default: /metrics
+app.UseHttpMetrics();
 
 // Configure Middleware
 app.UseAuthentication();

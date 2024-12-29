@@ -5,5 +5,7 @@
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=4a428903_002Db1a7_002D4411_002D8d33_002Dec2bfd4c8a18/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="AuthServiceTests" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
   &lt;TestAncestor&gt;
     &lt;TestId&gt;xUnit::31535A41-2B69-4C65-8CFC-4AC1F3AA14CB::net8.0::AuthServices.Tests.AuthServiceTests&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::31535A41-2B69-4C65-8CFC-4AC1F3AA14CB::net8.0::AuthServicesIntegrationTest.RegisterUser_MessageFlow_Success&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::31535A41-2B69-4C65-8CFC-4AC1F3AA14CB::net8.0::AuthServicesIntegrationTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
